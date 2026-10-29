@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Net Browser
+Comment=Minimalist browser with liquid glass and uBlock Origin Lite
+Exec=net-browser %U
+Icon=net-browser
+Categories=Network;WebBrowser;
+StartupWMClass=net-browser
+MimeType=text/html;x-scheme-handler/http;x-scheme-handler/https;
+Terminal=false

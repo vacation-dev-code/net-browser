@@ -1,0 +1,55 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<style>
+  *{box-sizing:border-box} body{margin:0;background:#e7e7ec;font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text",Helvetica,Arial,sans-serif}
+  .window{width:1240px;height:760px;margin:20px auto;background:#fff;border-radius:12px;overflow:hidden;position:relative;box-shadow:0 24px 70px rgba(0,0,0,.28),0 2px 10px rgba(0,0,0,.15)}
+  .page{position:absolute;inset:0;overflow:hidden;background:#fff}
+  .hero{height:300px;background:linear-gradient(135deg,#a8c8e8 0%,#e8d5c4 55%,#c4d8c8 100%);display:flex;align-items:flex-end;padding:28px 48px}
+  .hero span{background:rgba(255,255,255,.85);padding:6px 10px;border-radius:999px;font-size:12px;letter-spacing:.08em;text-transform:uppercase}
+  .article{padding:28px 48px 40px;max-width:760px}
+  .article h1{font-size:38px;line-height:1.15;letter-spacing:-.02em;margin:0 0 12px;color:#1d1d1f}
+  .article .meta{color:#86868b;font-size:14px;margin-bottom:20px}
+  .article p{font-size:17px;line-height:1.65;color:#333;margin:0 0 16px}
+  .topbar{position:absolute;top:0;left:0;right:0;height:28px;z-index:10;display:flex;align-items:center;
+    background:rgba(255,255,255,.02);backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%);
+    border-bottom:1px solid rgba(0,0,0,.06)}
+  .lights{position:absolute;left:12px;display:flex;gap:8px}
+  .lights i{width:12px;height:12px;border-radius:50%;display:block}
+  .lights i:nth-child(1){background:#ff5f57}.lights i:nth-child(2){background:#febc2e}.lights i:nth-child(3){background:#28c840}
+  .nav{margin-left:76px;display:flex;gap:2px;color:#1d1d1f}
+  .nav span{font-size:17px;width:28px;text-align:center;line-height:22px}
+  .opts{margin-left:auto;margin-right:10px;font-size:18px;letter-spacing:2px;color:#1d1d1f;line-height:22px}
+  .progress{position:absolute;left:0;top:27px;height:2px;width:38%;background:#007aff;z-index:11}
+  .sidebar{position:absolute;top:0;right:0;bottom:0;width:220px;z-index:9;
+    background:rgba(246,246,248,.72);backdrop-filter:blur(24px) saturate(180%);-webkit-backdrop-filter:blur(24px) saturate(180%);
+    border-left:1px solid rgba(0,0,0,.08);padding:36px 8px 12px;display:flex;flex-direction:column}
+  .row{display:flex;align-items:center;gap:8px;padding:0 8px;height:30px;border-radius:8px;font-size:13px;color:#6e6e73;white-space:nowrap;overflow:hidden}
+  .row.active{background:rgba(0,122,255,.15);color:#1d1d1f}
+  .avatar{width:18px;height:18px;min-width:18px;border-radius:50%;background:#d2d2d7;color:#555;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:600}
+  .row.active .avatar{background:#007aff;color:#fff}
+  .row .title{overflow:hidden;text-overflow:ellipsis;flex:1}
+  .row .x{font-size:16px;color:#86868b}
+  .newtab{margin-top:auto;padding:8px;font-size:13px;color:#6e6e73}
+  .hint{position:absolute;right:228px;top:120px;background:#1d1d1f;color:#fff;font-size:12px;padding:6px 9px;border-radius:6px;z-index:12}
+</style></head>
+<body><div class="window"><div class="page">
+  <div class="hero"><span>Design · Minimal</span></div>
+  <div class="article">
+    <h1>The quiet browser: less chrome, more page</h1>
+    <div class="meta">A clean article, with nothing in the way — the whole point of the slim bar.</div>
+    <p>This is what a page looks like in Minimal. The top bar is only 28 points tall and almost completely transparent, so the article itself starts almost at the very top of the window.</p>
+    <p>Tabs live on the right, hidden until you need them. Move your mouse to the right edge and this sidebar slides out over the page — it never squeezes the article sideways.</p>
+    <p>Back, forward, and the three-dot menu are the only controls up top. Everything else — a new tab, a URL, the blocker — lives in the menu or on the new-tab page.</p>
+  </div>
+</div>
+<div class="topbar"><div class="lights"><i></i><i></i><i></i></div><div class="nav"><span>‹</span><span>›</span></div><div class="opts">⋯</div></div>
+<div class="progress"></div>
+<div class="hint">◀ hovered right edge</div>
+<div class="sidebar">
+  <div class="row active"><span class="avatar">Q</span><span class="title">The quiet browser: less chrome…</span><span class="x">×</span></div>
+  <div class="row"><span class="avatar">D</span><span class="title">DuckDuckGo — search</span></div>
+  <div class="row"><span class="avatar">G</span><span class="title">GitHub — minimal-browser</span></div>
+  <div class="row"><span class="avatar">N</span><span class="title">New Tab</span></div>
+  <div class="newtab">+ New Tab</div>
+</div>
+</div></body></html>

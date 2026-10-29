@@ -1,0 +1,11 @@
+#!/bin/sh
+# Net Browser launcher, installed to /usr/bin/net-browser by the PKGBUILD.
+# Uses the system Electron package, so the app does not bundle its own.
+# Wayland hint defaults to auto; override with ELECTRON_OZONE_PLATFORM_HINT
+# in the environment if your compositor needs something else.
+export ELECTRON_OZONE_PLATFORM_HINT="${ELECTRON_OZONE_PLATFORM_HINT:-auto}"
+if command -v electron >/dev/null 2>&1; then
+  exec electron /usr/share/net-browser "$@"
+else
+  exec /usr/lib/electron/electron /usr/share/net-browser "$@"
+fi

@@ -1,0 +1,51 @@
+# Net Browser v0.1 — Arch Linux package (local build, not AUR-ready yet).
+#
+# How to build it (do NOT run makepkg in this folder directly):
+#   bash arch/build-pkg.sh
+# That script tars the project, drops this PKGBUILD + the desktop
+# entry + the icon + the launcher into a build directory, and runs
+# makepkg there. The resulting net-browser-0.1.0-1-x86_64.pkg.tar.zst
+# installs with:  sudo pacman -U net-browser-0.1.0-1-x86_64.pkg.tar.zst
+#
+# Before submitting this to the AUR, you must:
+#   - replace the SKIP checksum with the real tarball sha256sum
+#   - remove the "local build" comment at the top
+#
+# Runtime: system Electron (Arch's `electron` package), NOT the npm
+# bundled Electron. That is deliberate: Arch users already get
+# Electron updates from pacman, and the app is just JS + HTML.
+# The ad blocker (@ghostery/adblocker-electron) is a plain JS npm
+# dependency: build() installs production deps only, so node_modules
+# ships the blocker but not the npm-bundled Electron (a devDependency).
+
+pkgname=net-browser
+pkgver=0.1.0
+pkgrel=1
+pkgdesc="Net Browser v0.1 — minimalist browser with liquid glass and uBlock Origin / EasyList ad blocking"
+arch=('x86_64')
+url="https://github.com/vacation-dev-code/net-browser"
+license=('MIT')
+depends=('electron')
+makedepends=('npm')
+optdepends=(
+  'picom: standalone compositor for blur on X11 / tiling WMs without one'
+)
+source=("net-browser-${pkgver}.tar.gz")
+sha256sums=('SKIP')
+
+build() {
+  cd "${srcdir}/net-browser-${pkgver}"
+  npm install --omit=dev
+}
+
+package() {
+  cd "${srcdir}/net-browser-${pkgver}"
+  install -dm755 "${pkgdir}/usr/share/net-browser"
+  cp -r main.js preload.js package.json renderer "${pkgdir}/usr/share/net-browser/"
+  cp -r node_modules "${pkgdir}/usr/share/net-browser/"
+  # The npm-bundled Electron is NOT shipped: --omit=dev in build()
+  # leaves it out, and the launcher uses the system electron binary.
+  install -Dm755 "${srcdir}/net-browser" "${pkgdir}/usr/bin/net-browser"
+  install -Dm644 "${srcdir}/net-browser.desktop" "${pkgdir}/usr/share/applications/net-browser.desktop"
+  install -Dm644 "${srcdir}/net-browser.png" "${pkgdir}/usr/share/icons/hicolor/512x512/apps/net-browser.png"
+}

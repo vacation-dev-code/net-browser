@@ -1,0 +1,221 @@
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", sans-serif; background: transparent; color: var(--text); }
+button { font: inherit; color: inherit; cursor: pointer; }
+.hidden { display: none !important; }
+
+/* Liquid glass, cross-platform.
+   macOS gets vibrancy from the window (main.js) AND this CSS.
+   Linux gets NO vibrancy — Electron's vibrancy is macOS-only —
+   so this CSS is the whole glass effect on Arch. Glass here is
+   built in layers, back to front:
+     1. the pane: a floating panel inset from the window edge, with
+        backdrop blur + saturation, a translucent tint, a specular
+        sheen in the top-left corner, and a gradient rim (::before)
+        that is bright where light would catch the edge
+     2. capsules inside it (nav, active tab, footer): a second,
+        lighter frosted layer with its own top highlight
+     3. a deep, soft drop shadow, so the pane floats over the page
+   Light and dark variants follow prefers-color-scheme, which main.js
+   drives from ⋯ → Settings → Theme (Auto / Light / Dark). Where
+   backdrop blur is unavailable (no compositor, or a <webview>
+   guest surface Chromium does not sample), the tint, rim and
+   shadow still read as glass; @supports gives a solid fallback.
+   There is no top bar: all chrome lives in the tabs pane, which
+   OVERLAYS the page, so the page always runs full-window. */
+:root {
+  --pane-inset: 10px;
+  --pane-width: 264px;
+  --text: #1d1d1f;
+  --text-muted: rgba(60, 60, 67, 0.62);
+  --tint: rgba(255, 255, 255, 0.34);
+  --layer: rgba(255, 255, 255, 0.52);
+  --hover: rgba(255, 255, 255, 0.38);
+  --sheen: rgba(255, 255, 255, 0.45);
+  --rim-bright: rgba(255, 255, 255, 0.95);
+  --rim-dim: rgba(255, 255, 255, 0.18);
+  --highlight: rgba(255, 255, 255, 0.85);
+  --shade: rgba(0, 0, 0, 0.06);
+  --menu-tint: rgba(250, 250, 252, 0.74);
+  --shadow: 0 30px 70px rgba(0, 0, 0, 0.22), 0 8px 24px rgba(0, 0, 0, 0.10), 0 1px 3px rgba(0, 0, 0, 0.08);
+  --layer-shadow: 0 6px 18px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.06);
+  --page: #f5f5f7;
+  --field: #fff;
+  --field-border: #d2d2d7;
+  --page-muted: #86868b;
+  --warn-bg: #fff3cd;
+  --warn-text: #664d03;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --text: #f5f5f7;
+    --text-muted: rgba(235, 235, 245, 0.55);
+    --tint: rgba(36, 36, 42, 0.46);
+    --layer: rgba(255, 255, 255, 0.11);
+    --hover: rgba(255, 255, 255, 0.09);
+    --sheen: rgba(255, 255, 255, 0.10);
+    --rim-bright: rgba(255, 255, 255, 0.42);
+    --rim-dim: rgba(255, 255, 255, 0.05);
+    --highlight: rgba(255, 255, 255, 0.22);
+    --shade: rgba(0, 0, 0, 0.30);
+    --menu-tint: rgba(44, 44, 50, 0.80);
+    --shadow: 0 30px 70px rgba(0, 0, 0, 0.55), 0 8px 24px rgba(0, 0, 0, 0.35), 0 1px 3px rgba(0, 0, 0, 0.30);
+    --layer-shadow: 0 6px 18px rgba(0, 0, 0, 0.30), 0 1px 2px rgba(0, 0, 0, 0.25);
+    --page: #161618;
+    --field: #232326;
+    --field-border: #3a3a3e;
+    --page-muted: #8e8e93;
+    --warn-bg: #3d3214;
+    --warn-text: #f5d77a;
+  }
+}
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  :root { --tint: rgba(246, 246, 248, 0.94); --menu-tint: rgba(250, 250, 252, 0.97); }
+  @media (prefers-color-scheme: dark) { :root { --tint: rgba(36, 36, 42, 0.95); --menu-tint: rgba(44, 44, 50, 0.97); } }
+}
+
+/* Go to URL popover */
+#goto {
+  position: absolute; top: 36px; left: 50%; transform: translateX(-50%); z-index: 30;
+  width: 320px; background: var(--field); border: 1px solid var(--field-border); border-radius: 12px;
+  padding: 8px; box-shadow: var(--shadow);
+}
+#goto input { width: 100%; border: 0; outline: none; font-size: 14px; padding: 4px; background: transparent; color: var(--text); }
+
+/* Blocker warning */
+#blocker-warning {
+  position: absolute; top: 0; left: 0; right: 0; z-index: 25; text-align: center;
+  background: var(--warn-bg); color: var(--warn-text); font-size: 12px; padding: 6px;
+}
+#blocker-warning code { background: rgba(0,0,0,0.08); padding: 1px 5px; border-radius: 4px; }
+
+/* Main area + tabs — full window, under the tabs pane */
+#main { position: absolute; top: 0; left: 0; right: 0; bottom: 0; }
+#tabs, #tabs webview { width: 100%; height: 100%; }
+#tabs webview { display: none; }
+#tabs webview.active { display: flex; }
+
+/* New-tab page */
+#start { height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; background: var(--page); color: var(--text); }
+#start h1 { font-size: 28px; font-weight: 600; letter-spacing: -0.5px; margin: 0 0 24px; }
+#start h1 span { font-size: 13px; font-weight: 400; color: var(--page-muted); border: 1px solid var(--field-border); border-radius: 999px; padding: 2px 8px; vertical-align: middle; }
+#start form { width: min(560px, 86vw); }
+#start input { width: 100%; padding: 12px 18px; font-size: 16px; border-radius: 999px; border: 1px solid var(--field-border); background: var(--field); color: var(--text); outline: none; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
+#start input:focus { border-color: #007aff; box-shadow: 0 0 0 3px rgba(0,122,255,0.15); }
+#start p { font-size: 13px; color: var(--page-muted); margin-top: 20px; text-align: center; }
+#start kbd { font-family: inherit; background: rgba(127,127,127,0.18); padding: 1px 6px; border-radius: 4px; }
+#start .blocker-note { max-width: 560px; line-height: 1.5; }
+
+/* ---- Tabs pane, layer 1: the floating glass panel ---------------------
+   Right edge by default, left with body.pane-left (⋯ → Settings).
+   Closed, it sits fully past the window edge, shadow included; .open
+   slides it in. It overlays the page — <webview> is a DOM element, so
+   unlike a native BrowserView it can sit on top of it with z-index. */
+#sidebar {
+  position: absolute; top: var(--pane-inset); bottom: var(--pane-inset); right: var(--pane-inset);
+  width: var(--pane-width); z-index: 15;
+  display: flex; flex-direction: column; gap: 12px; padding: 12px;
+  border-radius: 26px; color: var(--text);
+  background:
+    radial-gradient(130% 60% at 0% 0%, var(--sheen), transparent 55%),
+    linear-gradient(180deg, var(--rim-dim), transparent 30%),
+    var(--tint);
+  backdrop-filter: blur(40px) saturate(190%) brightness(1.04);
+  -webkit-backdrop-filter: blur(40px) saturate(190%) brightness(1.04);
+  box-shadow: inset 0 1px 0 var(--highlight), inset 0 -1px 0 var(--shade), var(--shadow);
+  transform: translateX(calc(100% + var(--pane-inset) + 80px));
+  transition: transform 0.3s cubic-bezier(0.2, 0.9, 0.25, 1);
+}
+body.pane-left #sidebar { right: auto; left: var(--pane-inset); transform: translateX(calc(-100% - var(--pane-inset) - 80px)); }
+#sidebar.open, body.pane-left #sidebar.open { transform: none; }
+/* Gradient rim: bright where light catches the top-left and bottom-
+   right edges, nearly gone in between — a 1px ring cut out with a mask. */
+#sidebar::before {
+  content: ''; position: absolute; inset: 0; border-radius: inherit; padding: 1px; pointer-events: none;
+  background: linear-gradient(155deg, var(--rim-bright), var(--rim-dim) 32%, var(--rim-dim) 68%, var(--rim-bright));
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor; mask-composite: exclude;
+}
+
+/* ---- Layer 2: capsules ------------------------------------------------ */
+.capsule {
+  display: flex; align-items: center; border-radius: 999px;
+  background: var(--layer);
+  box-shadow: inset 0 1px 0 var(--highlight), inset 0 -1px 0 var(--shade), var(--layer-shadow);
+}
+.spacer { flex: 1; }
+.icon-btn {
+  width: 34px; height: 34px; border: 0; border-radius: 50%; background: transparent;
+  display: inline-flex; align-items: center; justify-content: center;
+  transition: background 0.15s, transform 0.15s;
+}
+.icon-btn:hover { background: var(--hover); }
+.icon-btn:active { transform: scale(0.9); }
+.icon-btn:disabled { opacity: 0.32; background: transparent; cursor: default; transform: none; }
+.icon-btn svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.icon-btn svg.dots { fill: currentColor; stroke: none; }
+
+/* Nav capsule, top. The row is also the window's drag handle — but
+   only while the pane is open: closed, the pane is off-window, and a
+   drag region left behind there would swallow clicks on the page. */
+#pane-top { display: flex; align-items: center; }
+#sidebar.open #pane-top { -webkit-app-region: drag; }
+#pane-top button { -webkit-app-region: no-drag; }
+body.mac #pane-top { padding-left: 68px; } /* room for the traffic lights */
+.nav { flex: 1; height: 44px; justify-content: space-around; padding: 0 8px; }
+
+/* Tabs */
+.pane-label {
+  display: flex; justify-content: space-between; padding: 4px 10px 0;
+  font-size: 11px; font-weight: 600; letter-spacing: 0.7px; text-transform: uppercase; color: var(--text-muted);
+}
+#tab-list { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; margin: 0 -4px; padding: 2px 4px 8px; }
+.tab-row {
+  display: flex; align-items: center; gap: 11px; width: 100%; min-height: 44px; padding: 0 10px 0 10px;
+  border: 0; border-radius: 16px; background: transparent; color: var(--text-muted);
+  font-size: 13px; text-align: left; white-space: nowrap;
+  transition: background 0.15s, color 0.15s, box-shadow 0.15s;
+}
+.tab-row:hover { background: var(--hover); color: var(--text); }
+.tab-row.active { background: var(--layer); color: var(--text); box-shadow: inset 0 1px 0 var(--highlight), inset 0 -1px 0 var(--shade), var(--layer-shadow); }
+.tab-row .avatar {
+  width: 26px; height: 26px; min-width: 26px; border-radius: 9px;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: 700; background: var(--hover); color: var(--text-muted);
+  box-shadow: inset 0 1px 0 var(--highlight);
+}
+.tab-row.active .avatar { background: linear-gradient(140deg, #6fd3ff, #0a7cff 60%, #4b4bff); color: #fff; box-shadow: inset 0 1px 0 rgba(255,255,255,0.5), 0 3px 10px rgba(10,124,255,0.45); }
+.tab-row .title { flex: 1; overflow: hidden; text-overflow: ellipsis; }
+.tab-row .key { font-size: 11px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.tab-row .close {
+  display: none; width: 24px; height: 24px; border-radius: 50%;
+  align-items: center; justify-content: center; font-size: 16px; color: var(--text-muted);
+}
+.tab-row .close:hover { background: var(--hover); color: var(--text); }
+.tab-row:hover .key { display: none; }
+.tab-row:hover .close { display: inline-flex; }
+
+/* Footer, bottom: logo left, ⋯ right — sitting straight on the pane,
+   no capsule and no divider line; ⋯ is its own small glass button. */
+#pane-bottom { display: flex; align-items: center; height: 44px; padding: 0 4px 0 6px; }
+.glass-btn { background: var(--layer); box-shadow: inset 0 1px 0 var(--highlight), inset 0 -1px 0 var(--shade), var(--layer-shadow); }
+.glass-btn:hover { background: var(--layer); filter: brightness(1.08); }
+#logo { width: 34px; height: 34px; filter: drop-shadow(0 3px 8px rgba(30, 110, 255, 0.35)); }
+
+/* ---- ⋯ menu: a third glass layer, opening upward from the footer,
+   inside the pane, so the pointer never leaves the pane using it ---- */
+#menu {
+  position: absolute; bottom: 66px; left: 12px; right: 12px; z-index: 30; padding: 8px;
+  border-radius: 20px; color: var(--text);
+  background: radial-gradient(120% 50% at 0% 0%, var(--sheen), transparent 60%), var(--menu-tint);
+  backdrop-filter: blur(30px) saturate(180%);
+  -webkit-backdrop-filter: blur(30px) saturate(180%);
+  box-shadow: inset 0 1px 0 var(--highlight), inset 0 -1px 0 var(--shade), var(--shadow);
+}
+#menu > button { display: block; width: 100%; text-align: left; border: 0; background: transparent; padding: 9px 12px; font-size: 13px; border-radius: 12px; }
+#menu > button:hover { background: var(--hover); }
+#menu hr { border: 0; border-top: 1px solid var(--rim-dim); margin: 6px 8px; }
+.menu-label { font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.6px; padding: 4px 12px 4px; }
+.menu-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 5px 6px 5px 12px; font-size: 13px; }
+.segmented { display: inline-flex; background: var(--hover); border-radius: 10px; padding: 3px; box-shadow: inset 0 1px 2px var(--shade); }
+.segmented button { border: 0; background: transparent; font-size: 12px; padding: 4px 9px; border-radius: 8px; }
+.segmented button.selected { background: var(--layer); box-shadow: inset 0 1px 0 var(--highlight), var(--layer-shadow); }

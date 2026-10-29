@@ -1,0 +1,34 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<style>
+  *{box-sizing:border-box} body{margin:0;background:#e7e7ec;font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text",Helvetica,Arial,sans-serif}
+  .window{width:1240px;height:760px;margin:20px auto;background:#fff;border-radius:12px;overflow:hidden;position:relative;box-shadow:0 24px 70px rgba(0,0,0,.28),0 2px 10px rgba(0,0,0,.15)}
+  .page{position:absolute;inset:0;overflow:hidden;background:#fff}
+  .hero{height:300px;background:linear-gradient(135deg,#a8c8e8 0%,#e8d5c4 55%,#c4d8c8 100%);display:flex;align-items:flex-end;padding:28px 48px}
+  .hero span{background:rgba(255,255,255,.85);padding:6px 10px;border-radius:999px;font-size:12px;letter-spacing:.08em;text-transform:uppercase}
+  .article{padding:28px 48px 40px;max-width:820px}
+  .article h1{font-size:38px;line-height:1.15;letter-spacing:-.02em;margin:0 0 12px;color:#1d1d1f}
+  .article .meta{color:#86868b;font-size:14px;margin-bottom:20px}
+  .article p{font-size:17px;line-height:1.65;color:#333;margin:0 0 16px}
+  .topbar{position:absolute;top:0;left:0;right:0;height:28px;z-index:10;display:flex;align-items:center;
+    background:rgba(255,255,255,.02);backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%);
+    border-bottom:1px solid rgba(0,0,0,.06)}
+  .lights{position:absolute;left:12px;display:flex;gap:8px}
+  .lights i{width:12px;height:12px;border-radius:50%;display:block}
+  .lights i:nth-child(1){background:#ff5f57}.lights i:nth-child(2){background:#febc2e}.lights i:nth-child(3){background:#28c840}
+  .nav{margin-left:76px;display:flex;gap:2px;color:#1d1d1f}
+  .nav span{font-size:17px;width:28px;text-align:center;line-height:22px}
+  .opts{margin-left:auto;margin-right:10px;font-size:18px;letter-spacing:2px;color:#1d1d1f;line-height:22px}
+</style></head>
+<body><div class="window"><div class="page">
+  <div class="hero"><span>Design · Minimal</span></div>
+  <div class="article">
+    <h1>The quiet browser: less chrome, more page</h1>
+    <div class="meta">Normal browsing — tabs hidden, top bar barely there.</div>
+    <p>This is the default state. No tab strip, no address bar, no toolbar. Just a 28-point glass bar at the top with back, forward, and the three-dot menu, and the full width of the window for the page itself.</p>
+    <p>Hover the right edge and the vertical tabs slide out. Move away and they disappear again — the page never reflows.</p>
+    <p>That is the whole interface. Everything else is one menu or one keyboard shortcut away.</p>
+  </div>
+</div>
+<div class="topbar"><div class="lights"><i></i><i></i><i></i></div><div class="nav"><span>‹</span><span>›</span></div><div class="opts">⋯</div></div>
+</div></body></html>

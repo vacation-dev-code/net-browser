@@ -1,0 +1,74 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<title>Net Browser v0.1</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <!-- Go to URL popover, shown by ⌘L and by ⋯ → Go to URL… -->
+  <div id="goto" class="hidden">
+    <input id="goto-input" type="text" placeholder="Search or type a URL" autocomplete="off">
+  </div>
+
+  <!-- Blocker warning: shown only if the filter lists failed to load. -->
+  <div id="blocker-warning" class="hidden">
+    Ad blocker unavailable: the filter lists download on first launch and that failed. Check your connection, then restart Net Browser.
+  </div>
+
+  <main id="main">
+    <!-- New-tab page, shown when the active tab has no URL yet.
+         This is where a URL is typed, because there is no address bar. -->
+    <section id="start" class="hidden">
+      <h1>Net Browser <span>v0.1</span></h1>
+      <form id="start-form"><input id="start-input" type="text" placeholder="Search or type a URL" autocomplete="off" autofocus></form>
+      <p><kbd>⌘L</kbd> go to a URL &nbsp;·&nbsp; <kbd>⌘T</kbd> new tab &nbsp;·&nbsp; hover the <span id="pane-side-hint">right</span> edge for tabs and controls</p>
+      <p class="blocker-note" id="blocker-note"></p>
+    </section>
+    <!-- <webview> tabs are created here by renderer.js, one per tab.
+         Only the active one is displayed; the rest stay alive. -->
+    <section id="tabs"></section>
+  </main>
+
+  <!-- Tabs pane: all of the browser's chrome — there is no top bar.
+       A floating liquid-glass panel, hidden past the window edge until
+       the pointer touches that edge; left or right is a setting in ⋯.
+       Layered top to bottom:
+         nav capsule:    back, reload, forward. macOS: main.js moves
+                         the traffic lights in beside it while open.
+         tabs:           Ctrl/⌘+1…9 jump to the first nine
+         footer:         logo, then ⋯ (menu + settings) -->
+  <aside id="sidebar">
+    <div id="pane-top">
+      <div class="nav capsule">
+        <button id="back" class="icon-btn" title="Back (⌘[)"><svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button>
+        <button id="reload" class="icon-btn" title="Reload (⌘R)"><svg viewBox="0 0 24 24"><path d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3"/><path d="M19.5 4.5v4.2h-4.2"/></svg></button>
+        <button id="forward" class="icon-btn" title="Forward (⌘])"><svg viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg></button>
+      </div>
+    </div>
+    <div class="pane-label"><span>Tabs</span><span id="tab-count"></span></div>
+    <div id="tab-list"></div>
+    <div id="pane-bottom">
+      <img id="logo" src="net-logo.png" alt="Net Browser" title="Net Browser v0.1">
+      <div class="spacer"></div>
+      <button id="options" class="icon-btn glass-btn" title="Menu and settings"><svg viewBox="0 0 24 24" class="dots"><circle cx="5.5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="18.5" cy="12" r="1.7"/></svg></button>
+    </div>
+    <div id="menu" class="hidden">
+      <button data-action="new-tab">New Tab</button>
+      <button data-action="new-window">New Window</button>
+      <button data-action="go-to-url">Go to URL…</button>
+      <hr>
+      <div class="menu-label">Settings</div>
+      <div class="menu-row">
+        <span>Theme</span>
+        <span class="segmented"><button data-theme="system">Auto</button><button data-theme="light">Light</button><button data-theme="dark">Dark</button></span>
+      </div>
+      <div class="menu-row">
+        <span>Tabs pane</span>
+        <span class="segmented"><button data-side="left">Left</button><button data-side="right">Right</button></span>
+      </div>
+      <button id="pin-pane">Keep pane open: Off</button>
+      <button id="blocker-toggle">Ad blocker: …</button>
+    </div>
+  </aside>
+
+  <script src="renderer.js"></script>
+</body></html>

@@ -1,0 +1,16 @@
+{
+  "description": "Net Browser v0.1 — a minimalist browser with uBlock Origin / EasyList ad blocking",
+  "devDependencies": {
+    "electron": "^45.1.0"
+  },
+  "main": "main.js",
+  "name": "net-browser",
+  "private": true,
+  "scripts": {
+    "start": "electron ."
+  },
+  "version": "0.1.0",
+  "dependencies": {
+    "@ghostery/adblocker-electron": "^2.20.3"
+  }
+}
