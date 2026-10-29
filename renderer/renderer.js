@@ -23,7 +23,8 @@ const SEARCH_URL = 'https://duckduckgo.com/?q=';
 const tabsEl = $('tabs');
 const startEl = $('start');
 
-let tabs = []; // { id, title, url, view, isStart, ready }
+let tabs = []; // { id, title, url, favicon, view, isStart, ready }
+let closedTabs = []; // { url, index }, most recent last — History → Reopen Closed Tab
 let activeId = null;
 let blocker = { present: false, enabled: false };
 let hideTimer = null;
@@ -48,11 +49,24 @@ function renderTabs() {
     const row = document.createElement('button');
     row.className = 'tab-row' + (tab.id === activeId ? ' active' : '');
     row.title = tab.title || 'New Tab';
-    const letter = (tab.title || 'New Tab').trim().charAt(0).toUpperCase() || '·';
-    row.innerHTML = '';
     const avatar = document.createElement('span');
     avatar.className = 'avatar';
-    avatar.textContent = letter;
+    // The site's own icon; the title's first letter until one arrives,
+    // or if it fails to load.
+    const letter = () => {
+      avatar.classList.remove('has-icon');
+      avatar.textContent = (tab.title || 'New Tab').trim().charAt(0).toUpperCase() || '·';
+    };
+    if (tab.favicon) {
+      const icon = document.createElement('img');
+      icon.src = tab.favicon;
+      icon.alt = '';
+      icon.addEventListener('error', () => { tab.favicon = null; letter(); });
+      avatar.classList.add('has-icon');
+      avatar.append(icon);
+    } else {
+      letter();
+    }
     const title = document.createElement('span');
     title.className = 'title';
     title.textContent = tab.title || 'New Tab';
@@ -104,7 +118,17 @@ function createWebview(tab) {
   view.addEventListener('did-navigate', (e) => {
     tab.url = e.url;
     tab.isStart = false;
+    // A new page: drop the old site's icon. page-favicon-updated
+    // brings the new one; sites that declare none get the
+    // conventional /favicon.ico, and the letter if that 404s.
+    try { tab.favicon = new URL(e.url).origin + '/favicon.ico'; } catch { tab.favicon = null; }
     renderTabs();
+  });
+  view.addEventListener('page-favicon-updated', (e) => {
+    if (e.favicons.length && e.favicons[0] !== tab.favicon) {
+      tab.favicon = e.favicons[0];
+      renderTabs();
+    }
   });
   view.addEventListener('did-finish-load', () => updateNavButtons());
   // target=_blank and window.open() arrive through main.js
@@ -134,6 +158,9 @@ function selectTab(id) {
   activeId = id;
   const tab = activeTab();
   if (tab && tab.isStart) {
+    // One start page serves every blank tab: clear what another tab
+    // left typed in it.
+    $('start-input').value = '';
     setTimeout(() => $('start-input').focus(), 0);
   }
   hideSidebarSoon();
@@ -144,6 +171,7 @@ function closeTab(id) {
   const index = tabs.findIndex((t) => t.id === id);
   if (index === -1) return;
   const [tab] = tabs.splice(index, 1);
+  if (tab.url && !tab.isStart) closedTabs = [...closedTabs, { url: tab.url, index }].slice(-20);
   if (tab.view) tab.view.remove();
   if (activeId === id) {
     const next = tabs[index] || tabs[tabs.length - 1];
@@ -177,9 +205,7 @@ async function refreshBlockerUI() {
   $('blocker-toggle').textContent =
     'Ad blocker: ' + (blocker.present ? (blocker.enabled ? 'On' : 'Off') : 'Unavailable');
   $('blocker-warning').classList.toggle('hidden', blocker.present);
-  $('blocker-note').textContent = blocker.present
-    ? 'Ad blocking: uBlock Origin / EasyList filters via the Ghostery engine, running in the background. On/off is in the ⋯ menu at the bottom of the tabs pane.'
-    : 'Ad blocking is OFF — the filter lists could not be loaded. See the warning above.';
+  $('help-blocker').textContent = blocker.present ? (blocker.enabled ? 'On' : 'Off') : 'Unavailable';
 }
 $('blocker-toggle').addEventListener('click', async () => {
   if (window.minimal) blocker = await window.minimal.toggleBlocker();
@@ -197,9 +223,23 @@ function doMenuAction(action) {
   else if (action === 'reload') { const v = activeTab()?.view; if (v) v.reload(); }
   else if (action === 'back') { const v = activeTab()?.view; if (v && v.canGoBack()) v.goBack(); }
   else if (action === 'forward') { const v = activeTab()?.view; if (v && v.canGoForward()) v.goForward(); }
+  else if (action === 'reopen-tab') {
+    // Back where it was in the list, as in Safari.
+    const closed = closedTabs.pop();
+    if (closed) {
+      const tab = newTab(closed.url);
+      tabs.splice(tabs.indexOf(tab), 1);
+      tabs.splice(Math.min(closed.index, tabs.length), 0, tab);
+      renderTabs();
+    }
+  }
+  else if (action.startsWith('zoom-')) zoomActive(action.slice('zoom-'.length));
+  else if (action === 'show-help') toggleHelp();
   else if (action.startsWith('select-tab-')) {
-    // Ctrl/⌘+1…9, caught in main.js whichever page has focus.
-    const tab = tabs[Number(action.slice('select-tab-'.length)) - 1];
+    // Ctrl/⌘+1…8 pick that tab; Ctrl/⌘+9 is always the last one, as in
+    // Safari and Chrome. Caught in main.js whichever page has focus.
+    const n = Number(action.slice('select-tab-'.length));
+    const tab = n === 9 ? tabs[tabs.length - 1] : tabs[n - 1];
     if (tab) selectTab(tab.id);
   }
 }
@@ -207,6 +247,7 @@ document.querySelectorAll('#menu [data-action]').forEach((btn) => {
   btn.addEventListener('click', () => doMenuAction(btn.dataset.action));
 });
 if (window.minimal) window.minimal.onMenuAction(doMenuAction);
+if (window.minimal) window.minimal.onNavigateActive((url) => navigateActive(url));
 if (window.minimal) {
   window.minimal.onOpenInNewTab((url, { background } = {}) => {
     newTab(url, { background });
@@ -215,9 +256,39 @@ if (window.minimal) {
   });
 }
 
+// --- Page zoom (View menu: ⌘0 / ⌘= / ⌘-) ----------------------------
+// Chrome's zoom steps. Chromium keeps zoom per site, so every tab on
+// the same site follows along, as in Chrome.
+const ZOOM_STEPS = [0.25, 0.33, 0.5, 0.67, 0.75, 0.8, 0.9, 1, 1.1, 1.25, 1.5, 1.75, 2, 2.5, 3, 4, 5];
+function zoomActive(direction) {
+  const tab = activeTab();
+  if (!tab || tab.isStart || !tab.ready) return;
+  const current = tab.view.getZoomFactor();
+  let next = 1;
+  if (direction === 'in') next = ZOOM_STEPS.find((z) => z > current + 0.001) ?? current;
+  else if (direction === 'out') next = [...ZOOM_STEPS].reverse().find((z) => z < current - 0.001) ?? current;
+  tab.view.setZoomFactor(next);
+}
+
+// --- Help (Help menu → Net Help / Keyboard Shortcuts) -----------------
+function toggleHelp(open = $('help').classList.contains('hidden')) {
+  $('help').classList.toggle('hidden', !open);
+}
+$('help').addEventListener('click', (e) => { if (e.target === $('help')) toggleHelp(false); });
+$('help-close').addEventListener('click', () => toggleHelp(false));
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') toggleHelp(false); });
+
 // --- Go to URL + start page -----------------------------------------
+// ⌘L opens it; ⌘L again, Esc, or clicking anywhere else closes it.
+function hideGoTo() {
+  if ($('goto').classList.contains('hidden')) return;
+  $('goto').classList.add('hidden');
+  const tab = activeTab();
+  if (tab && !tab.isStart) tab.view.focus();
+}
 function showGoTo() {
   const pop = $('goto');
+  if (!pop.classList.contains('hidden')) return hideGoTo();
   pop.classList.remove('hidden');
   const input = $('goto-input');
   input.value = '';
@@ -226,12 +297,15 @@ function showGoTo() {
 $('goto-input').addEventListener('keydown', (e) => {
   if (e.key === 'Enter') {
     const url = urlFor(e.target.value);
-    $('goto').classList.add('hidden');
+    hideGoTo();
     if (url) navigateActive(url);
   } else if (e.key === 'Escape') {
-    $('goto').classList.add('hidden');
+    hideGoTo();
   }
 });
+// Focus moving to a page or the pane closes it too. Deferred, so that
+// ⌘L while it is open is a close, not a close-then-reopen.
+$('goto-input').addEventListener('blur', () => setTimeout(hideGoTo, 0));
 $('start-form').addEventListener('submit', (e) => {
   e.preventDefault();
   const url = urlFor($('start-input').value);
@@ -242,7 +316,9 @@ $('start-form').addEventListener('submit', (e) => {
 // Kept in this page's localStorage, which lives in the app's persistent
 // default session, so settings survive restarts.
 const SETTINGS_KEY = 'net-browser.settings';
-const settings = { paneSide: 'right', panePinned: false, theme: 'system' };
+// glassTransparency: 0 = solid pane, 100 = clear glass (blur only).
+// paneWidth: dragged with the pane's inner edge (see below).
+const settings = { paneSide: 'right', panePinned: false, theme: 'system', glassTransparency: 66, paneWidth: 264 };
 try { Object.assign(settings, JSON.parse(localStorage.getItem(SETTINGS_KEY))); } catch {}
 
 function saveSettings() {
@@ -259,6 +335,8 @@ function applySettings() {
   if (window.minimal) window.minimal.setTheme(settings.theme);
   $('pane-side-hint').textContent = settings.paneSide;
   $('pin-pane').textContent = 'Keep pane open: ' + (settings.panePinned ? 'On' : 'Off');
+  applyGlass();
+  applyPaneWidth();
   if (settings.panePinned) setPaneOpen(true);
   syncWindowButtons();
 }
@@ -276,6 +354,19 @@ document.querySelectorAll('[data-theme]').forEach((btn) => {
     applySettings();
   });
 });
+// Transparency slider: drives --glass-opacity, which scales the pane's
+// tint (styles.css). Applied live while dragging, saved on release.
+function applyGlass() {
+  $('glass-transparency').value = settings.glassTransparency;
+  document.documentElement.style.setProperty('--glass-opacity', String(1 - settings.glassTransparency / 100));
+}
+$('glass-transparency').addEventListener('input', (e) => {
+  settings.glassTransparency = Number(e.target.value);
+  applyGlass();
+});
+$('glass-transparency').addEventListener('change', saveSettings);
+// The slider sits in the ⋯ menu; a click on it must not close the menu.
+$('glass-transparency').addEventListener('click', (e) => e.stopPropagation());
 $('pin-pane').addEventListener('click', () => {
   settings.panePinned = !settings.panePinned;
   saveSettings();
@@ -286,13 +377,15 @@ $('pin-pane').addEventListener('click', () => {
 // --- Tabs pane hover --------------------------------------------------
 // The pane opens when the pointer touches its window edge and slides
 // away again shortly after the pointer leaves it (unless pinned).
-const PANE_WIDTH = 264; // keep in sync with --pane-width / --pane-inset
-const PANE_INSET = 10;
+const PANE_WIDTH_DEFAULT = 264;
+const PANE_WIDTH_MIN = 240; // narrower squeezes the nav capsule beside the traffic lights
+const PANE_WIDTH_MAX = 560;
+const PANE_INSET = 10; // keep in sync with --pane-inset
 const PANE_EDGE = 24; // px from the window edge that opens the pane
 
 function syncWindowButtons() {
   if (window.minimal) {
-    window.minimal.setWindowButtons($('sidebar').classList.contains('open'), settings.paneSide, PANE_WIDTH, PANE_INSET);
+    window.minimal.setWindowButtons($('sidebar').classList.contains('open'), settings.paneSide, settings.paneWidth, PANE_INSET);
   }
 }
 function setPaneOpen(open) {
@@ -316,7 +409,9 @@ function peekPane() {
 // where the <webview> swallows mouse events — from main.js.
 function onPointer(x) {
   const fromEdge = settings.paneSide === 'left' ? x : window.innerWidth - x;
-  const inPane = $('sidebar').classList.contains('open') && fromEdge <= PANE_INSET + PANE_WIDTH;
+  // +6: the resize handle pokes a few px past the pane's inner edge.
+  const inPane = $('sidebar').classList.contains('open') && fromEdge <= PANE_INSET + settings.paneWidth + 6;
+  if (resizing) return;
   if (fromEdge <= PANE_EDGE || inPane) {
     clearTimeout(hideTimer);
     setPaneOpen(true);
@@ -325,14 +420,56 @@ function onPointer(x) {
   }
 }
 document.addEventListener('mousemove', (e) => onPointer(e.clientX));
+// The right-side traffic lights are placed from the window's width.
+window.addEventListener('resize', () => { applyPaneWidth(); syncWindowButtons(); });
+
+// --- Expandable pane ---------------------------------------------------
+// Drag the pane's inner edge to make it wider or narrower; double-click
+// the edge to reset. While dragging, a shield covers the page: the
+// pointer crosses the <webview>, which would otherwise swallow the
+// mouse events and drop the drag.
+let resizing = false;
+function clampPaneWidth(width) {
+  const max = Math.min(PANE_WIDTH_MAX, window.innerWidth - 2 * PANE_INSET - 160);
+  return Math.round(Math.max(PANE_WIDTH_MIN, Math.min(max, width)));
+}
+function applyPaneWidth() {
+  settings.paneWidth = clampPaneWidth(settings.paneWidth);
+  document.documentElement.style.setProperty('--pane-width', settings.paneWidth + 'px');
+}
+$('pane-resize').addEventListener('mousedown', (e) => {
+  e.preventDefault();
+  resizing = true;
+  clearTimeout(hideTimer);
+  document.body.classList.add('resizing-pane');
+});
+document.addEventListener('mousemove', (e) => {
+  if (!resizing) return;
+  const fromEdge = settings.paneSide === 'left' ? e.clientX : window.innerWidth - e.clientX;
+  settings.paneWidth = clampPaneWidth(fromEdge - PANE_INSET);
+  applyPaneWidth();
+  syncWindowButtons();
+});
+document.addEventListener('mouseup', () => {
+  if (!resizing) return;
+  resizing = false;
+  document.body.classList.remove('resizing-pane');
+  saveSettings();
+});
+$('pane-resize').addEventListener('dblclick', () => {
+  settings.paneWidth = PANE_WIDTH_DEFAULT;
+  applyPaneWidth();
+  syncWindowButtons();
+  saveSettings();
+});
 if (window.minimal) window.minimal.onGuestPointer(({ x }) => onPointer(x));
 
 // --- Platform ----------------------------------------------------------
 if (window.minimal && window.minimal.platform === 'linux') {
   document.body.classList.add('linux');
-  // Start-page hints say ⌘ on macOS; on Linux they are Ctrl.
-  document.querySelectorAll('#start kbd').forEach((kbd) => {
-    kbd.textContent = kbd.textContent.replace('⌘', 'Ctrl+');
+  // Start-page and help shortcuts say ⌘ on macOS; on Linux they are Ctrl.
+  document.querySelectorAll('#start kbd, #help dt').forEach((kbd) => {
+    kbd.textContent = kbd.textContent.replaceAll('⇧⌘', 'Ctrl+Shift+').replaceAll('⌘', 'Ctrl+');
   });
 }
 

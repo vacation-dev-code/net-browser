@@ -27,7 +27,11 @@ button { font: inherit; color: inherit; cursor: pointer; }
   --pane-width: 264px;
   --text: #1d1d1f;
   --text-muted: rgba(60, 60, 67, 0.62);
-  --tint: rgba(255, 255, 255, 0.34);
+  /* --glass-opacity: 0…1, from ⋯ → Settings → Transparency (renderer.js).
+     It scales the pane's tint only; blur, rim and shadow stay, so even
+     at 0 the pane still reads as glass. Default 0.34 = the original look. */
+  --glass-opacity: 0.34;
+  --tint: rgba(255, 255, 255, calc(0.02 + 0.94 * var(--glass-opacity)));
   --layer: rgba(255, 255, 255, 0.52);
   --hover: rgba(255, 255, 255, 0.38);
   --sheen: rgba(255, 255, 255, 0.45);
@@ -49,7 +53,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   :root {
     --text: #f5f5f7;
     --text-muted: rgba(235, 235, 245, 0.55);
-    --tint: rgba(36, 36, 42, 0.46);
+    --tint: rgba(36, 36, 42, calc(0.16 + 0.88 * var(--glass-opacity)));
     --layer: rgba(255, 255, 255, 0.11);
     --hover: rgba(255, 255, 255, 0.09);
     --sheen: rgba(255, 255, 255, 0.10);
@@ -97,13 +101,28 @@ button { font: inherit; color: inherit; cursor: pointer; }
 /* New-tab page */
 #start { height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; background: var(--page); color: var(--text); }
 #start h1 { font-size: 28px; font-weight: 600; letter-spacing: -0.5px; margin: 0 0 24px; }
-#start h1 span { font-size: 13px; font-weight: 400; color: var(--page-muted); border: 1px solid var(--field-border); border-radius: 999px; padding: 2px 8px; vertical-align: middle; }
 #start form { width: min(560px, 86vw); }
 #start input { width: 100%; padding: 12px 18px; font-size: 16px; border-radius: 999px; border: 1px solid var(--field-border); background: var(--field); color: var(--text); outline: none; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
 #start input:focus { border-color: #007aff; box-shadow: 0 0 0 3px rgba(0,122,255,0.15); }
 #start p { font-size: 13px; color: var(--page-muted); margin-top: 20px; text-align: center; }
 #start kbd { font-family: inherit; background: rgba(127,127,127,0.18); padding: 1px 6px; border-radius: 4px; }
-#start .blocker-note { max-width: 560px; line-height: 1.5; }
+
+/* Help sheet (Help menu): a glass card over a dimmed window */
+#help { position: absolute; inset: 0; z-index: 50; display: flex; align-items: center; justify-content: center; background: rgba(0, 0, 0, 0.28); }
+.help-card {
+  position: relative; width: min(460px, 90vw); max-height: 86vh; overflow-y: auto; padding: 22px 26px;
+  border-radius: 24px; color: var(--text); font-size: 13px; line-height: 1.5;
+  background: radial-gradient(120% 50% at 0% 0%, var(--sheen), transparent 60%), var(--menu-tint);
+  backdrop-filter: blur(30px) saturate(180%); -webkit-backdrop-filter: blur(30px) saturate(180%);
+  box-shadow: inset 0 1px 0 var(--highlight), inset 0 -1px 0 var(--shade), var(--shadow);
+}
+.help-card h2 { margin: 0 0 6px; font-size: 20px; }
+.help-card h3 { margin: 18px 0 6px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.6px; color: var(--text-muted); }
+.help-card p { margin: 0; color: var(--text-muted); }
+#help-close { position: absolute; top: 12px; right: 12px; }
+.shortcuts { display: grid; grid-template-columns: max-content 1fr; gap: 6px 18px; margin: 0; }
+.shortcuts dt { font-variant-numeric: tabular-nums; color: var(--text-muted); }
+.shortcuts dd { margin: 0; }
 
 /* ---- Tabs pane, layer 1: the floating glass panel ---------------------
    Right edge by default, left with body.pane-left (⋯ → Settings).
@@ -125,6 +144,13 @@ button { font: inherit; color: inherit; cursor: pointer; }
   transform: translateX(calc(100% + var(--pane-inset) + 80px));
   transition: transform 0.3s cubic-bezier(0.2, 0.9, 0.25, 1);
 }
+/* Expandable: the inner edge is a drag handle for the pane's width.
+   While dragging, a shield over the whole window keeps the pointer
+   events in this page (a <webview> under the pointer would take them). */
+#pane-resize { position: absolute; top: 28px; bottom: 28px; left: -4px; width: 10px; cursor: col-resize; z-index: 2; }
+body.pane-left #pane-resize { left: auto; right: -4px; }
+body.resizing-pane::after { content: ''; position: fixed; inset: 0; z-index: 40; cursor: col-resize; }
+body.resizing-pane #sidebar { transition: none; }
 body.pane-left #sidebar { right: auto; left: var(--pane-inset); transform: translateX(calc(-100% - var(--pane-inset) - 80px)); }
 #sidebar.open, body.pane-left #sidebar.open { transform: none; }
 /* Gradient rim: bright where light catches the top-left and bottom-
@@ -160,7 +186,7 @@ body.pane-left #sidebar { right: auto; left: var(--pane-inset); transform: trans
 #pane-top { display: flex; align-items: center; }
 #sidebar.open #pane-top { -webkit-app-region: drag; }
 #pane-top button { -webkit-app-region: no-drag; }
-body.mac #pane-top { padding-left: 68px; } /* room for the traffic lights */
+body.mac #pane-top { padding-left: 80px; } /* room for the traffic lights — see 'window-buttons' in main.js */
 .nav { flex: 1; height: 44px; justify-content: space-around; padding: 0 8px; }
 
 /* Tabs */
@@ -183,6 +209,10 @@ body.mac #pane-top { padding-left: 68px; } /* room for the traffic lights */
   font-size: 11px; font-weight: 700; background: var(--hover); color: var(--text-muted);
   box-shadow: inset 0 1px 0 var(--highlight);
 }
+/* Site icon on a neutral chip: sites hand dark-mode icons (light glyphs)
+   to dark mode, so a fixed white chip would hide them. */
+.tab-row .avatar.has-icon, .tab-row.active .avatar.has-icon { background: var(--layer); box-shadow: inset 0 1px 0 var(--highlight), var(--layer-shadow); }
+.tab-row .avatar img { width: 18px; height: 18px; object-fit: contain; }
 .tab-row.active .avatar { background: linear-gradient(140deg, #6fd3ff, #0a7cff 60%, #4b4bff); color: #fff; box-shadow: inset 0 1px 0 rgba(255,255,255,0.5), 0 3px 10px rgba(10,124,255,0.45); }
 .tab-row .title { flex: 1; overflow: hidden; text-overflow: ellipsis; }
 .tab-row .key { font-size: 11px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
@@ -219,3 +249,4 @@ body.mac #pane-top { padding-left: 68px; } /* room for the traffic lights */
 .segmented { display: inline-flex; background: var(--hover); border-radius: 10px; padding: 3px; box-shadow: inset 0 1px 2px var(--shade); }
 .segmented button { border: 0; background: transparent; font-size: 12px; padding: 4px 9px; border-radius: 8px; }
 .segmented button.selected { background: var(--layer); box-shadow: inset 0 1px 0 var(--highlight), var(--layer-shadow); }
+#glass-transparency { width: 110px; accent-color: #0a7cff; }
