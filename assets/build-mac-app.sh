@@ -37,8 +37,13 @@ set_plist CFBundleShortVersionString "$(node -p 'require("./package.json").versi
 
 DEST="$APP/Contents/Resources/app"
 mkdir -p "$DEST"
-cp -R main.js preload.js package.json renderer assets "$DEST/"
+cp -R main.js preload.js package.json renderer assets ai "$DEST/"
 rm -f "$DEST/assets/"*.sh
+# A local require the bundle is missing kills startup before any window
+# opens (ai/ once was). Fail the build instead.
+for mod in $(grep -o "require('\./[^']*')" main.js | sed "s/require('\.\/\(.*\)')/\1/"); do
+  [[ -e "$DEST/$mod" || -e "$DEST/$mod.js" ]] || { echo "Net.app is missing $mod (required by main.js): add it to the copy above." >&2; exit 1; }
+done
 # Runtime dependencies only — electron itself is the bundle.
 (cd "$DEST" && npm install --omit=dev --no-audit --no-fund >/dev/null)
 
