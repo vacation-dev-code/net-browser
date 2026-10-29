@@ -11,7 +11,7 @@ bash arch/install-arch.sh
 ./net.sh
 ```
 
-That installs `nodejs`, `npm`, `git` with pacman, and runs `npm install` (bundled Electron + the ad blocker). The filter lists download on first launch. The browser itself is unchanged from the macOS v0.1: no top bar, one hidden tabs pane (left or right) holding back / reload / forward, the tabs and ⋯, no address bar, uBlock Origin / EasyList ad blocking on every tab.
+That installs `nodejs`, `npm`, `git` with pacman, and runs `npm install` (bundled Electron + the ad blocker). The filter lists download on first launch. The browser itself is unchanged from the macOS v0.1: no top bar, one hidden tabs pane (left or right) holding back / reload / forward, the tabs and ⋯, no address bar, uBlock Origin / EasyList ad blocking on every tab, and the Claude pane (a terminal running Claude Code beside the page, which needs Claude Code installed — see the main README).
 
 ## Proper package (optional)
 
@@ -21,7 +21,7 @@ sudo pacman -U arch/build/net-browser-0.1.0-1-x86_64.pkg.tar.zst
 net-browser
 ```
 
-This builds a real `.pkg.tar.zst` with `makepkg`. It uses Arch's system `electron` package instead of the npm-bundled one, installs the app to `/usr/share/net-browser`, the launcher to `/usr/bin/net-browser`, the desktop entry to `/usr/share/applications/`, and the icon to `/usr/share/icons/hicolor/512x512/apps/`. The ad blocker ships inside the package as a production-only `node_modules` (no bundled Electron); its filter lists download on first launch.
+This builds a real `.pkg.tar.zst` with `makepkg`. It uses Arch's system `electron` package instead of the npm-bundled one, installs the app to `/usr/share/net-browser`, the launcher to `/usr/bin/net-browser`, the desktop entry to `/usr/share/applications/`, and the icon to `/usr/share/icons/hicolor/512x512/apps/`. The ad blocker and the Claude pane's terminal (xterm.js, and node-pty's prebuilt x86_64 binary, which works with any Electron) ship inside the package as a production-only `node_modules` (no bundled Electron); the filter lists download on first launch.
 
 Note: the PKGBUILD in this folder is a *local* build, not AUR-ready yet — its `url` is a placeholder and its checksum is `SKIP`. Replace both with your real repo URL and tarball checksum before submitting it to the AUR. That is stated in the PKGBUILD header too, so it does not silently ship that way.
 

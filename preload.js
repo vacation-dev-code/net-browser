@@ -15,5 +15,20 @@ contextBridge.exposeInMainWorld('minimal', {
   // Tabs pane: pointer position over the <webview> tabs (see main.js),
   // and the macOS traffic lights following the pane.
   onGuestPointer: (callback) => ipcRenderer.on('guest-pointer', (_event, point) => callback(point)),
-  setWindowButtons: (visible, side, paneWidth, inset) => ipcRenderer.invoke('window-buttons', { visible, side, paneWidth, inset }),
+  setWindowButtons: (visible, side, paneWidth, inset, offsetLeft, offsetRight) =>
+    ipcRenderer.invoke('window-buttons', { visible, side, paneWidth, inset, offsetLeft, offsetRight }),
+  // Claude pane: this window's terminal (ai/terminal.js) and Claude's
+  // cursor over the page (ai/browser-tools.js).
+  termStart: (cols, rows, restart = false) => ipcRenderer.invoke('term-start', { cols, rows, restart }),
+  termInput: (data) => ipcRenderer.send('term-input', data),
+  termResize: (cols, rows) => ipcRenderer.send('term-resize', { cols, rows }),
+  termFocus: (focused) => ipcRenderer.send('term-focus', focused),
+  termLeave: () => ipcRenderer.send('term-leave'),
+  termMenu: (hasSelection) => ipcRenderer.invoke('term-menu', hasSelection),
+  onTermData: (callback) => ipcRenderer.on('term-data', (_event, data) => callback(data)),
+  onTermExit: (callback) => ipcRenderer.on('term-exit', (_event, code) => callback(code)),
+  readClipboard: () => ipcRenderer.invoke('clipboard-read'),
+  writeClipboard: (text) => ipcRenderer.send('clipboard-write', text),
+  onAICursor: (callback) => ipcRenderer.on('ai-cursor', (_event, move) => callback(move)),
+  onAIFocusTerminal: (callback) => ipcRenderer.on('ai-focus-terminal', () => callback()),
 });

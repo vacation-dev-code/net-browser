@@ -10,7 +10,8 @@ if ! command -v npm >/dev/null 2>&1; then
   exit 1
 fi
 
-if [[ ! -d node_modules/@ghostery/adblocker-electron ]]; then
+# First run, or package.json changed (a git pull that added a dependency).
+if [[ ! -f node_modules/.package-lock.json || package.json -nt node_modules/.package-lock.json ]]; then
   npm install
 fi
 

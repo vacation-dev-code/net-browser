@@ -1,9 +1,28 @@
 <!doctype html>
 <html><head><meta charset="utf-8">
 <title>Net Browser v0.1</title>
+<link rel="stylesheet" href="../node_modules/@xterm/xterm/css/xterm.css">
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
+  <!-- Claude pane: a terminal running Claude Code (main.js → ai/terminal.js),
+       docked on the left or right, about a quarter of the window. The page
+       area (#stage) shrinks beside it rather than sliding under it, so the
+       page Claude points at is never covered. -->
+  <aside id="ai-pane">
+    <div id="ai-panel">
+      <div id="ai-head">
+        <span class="ai-mark"></span><span class="ai-name">Claude</span><span class="ai-sub">in Net Browser</span>
+        <div class="spacer"></div>
+        <button id="ai-restart" class="icon-btn" title="Restart Claude"><svg viewBox="0 0 24 24"><path d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3"/><path d="M19.5 4.5v4.2h-4.2"/></svg></button>
+        <button id="ai-hide" class="icon-btn" title="Hide Claude"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+      </div>
+      <div id="term"></div>
+    </div>
+  </aside>
+
+  <!-- Page area: everything beside the Claude pane. -->
+  <div id="stage">
   <!-- Go to URL popover, shown by ⌘L and by ⋯ → Go to URL… -->
   <div id="goto" class="hidden">
     <input id="goto-input" type="text" placeholder="Search or type a URL" autocomplete="off">
@@ -20,7 +39,7 @@
     <section id="start" class="hidden">
       <h1>Net Browser <span>v0.1</span></h1>
       <form id="start-form"><input id="start-input" type="text" placeholder="Search or type a URL" autocomplete="off" autofocus></form>
-      <p><kbd>⌘L</kbd> go to a URL &nbsp;·&nbsp; <kbd>⌘T</kbd> new tab &nbsp;·&nbsp; hover the <span id="pane-side-hint">right</span> edge for tabs and controls</p>
+      <p><kbd>⌘L</kbd> go to a URL &nbsp;·&nbsp; <kbd>⌘T</kbd> new tab &nbsp;·&nbsp; <kbd>⌃`</kbd> Claude &nbsp;·&nbsp; hover the <span id="pane-side-hint">right</span> edge for tabs and controls</p>
       <p class="blocker-note" id="blocker-note"></p>
     </section>
     <!-- <webview> tabs are created here by renderer.js, one per tab.
@@ -55,6 +74,7 @@
       <button data-action="new-tab">New Tab</button>
       <button data-action="new-window">New Window</button>
       <button data-action="go-to-url">Go to URL…</button>
+      <button data-action="toggle-ai" id="ai-toggle">Show Claude</button>
       <hr>
       <div class="menu-label">Settings</div>
       <div class="menu-row">
@@ -65,10 +85,29 @@
         <span>Tabs pane</span>
         <span class="segmented"><button data-side="left">Left</button><button data-side="right">Right</button></span>
       </div>
+      <div class="menu-row">
+        <span>Claude pane</span>
+        <span class="segmented"><button data-ai-side="left">Left</button><button data-ai-side="right">Right</button></span>
+      </div>
       <button id="pin-pane">Keep pane open: Off</button>
+      <button id="ai-launch">Claude at launch: On</button>
       <button id="blocker-toggle">Ad blocker: …</button>
     </div>
   </aside>
 
+  <!-- Claude's cursor: drawn over the page from coordinates main.js sends
+       (ai/browser-tools.js). It never takes clicks — pointer-events: none. -->
+  <div id="ai-box" class="hidden"></div>
+  <div id="ai-cursor" class="hidden" aria-hidden="true">
+    <svg viewBox="0 0 24 24"><path d="M3 2.5l15.4 8.3-6.7 1.5-3.5 6.4z"/></svg>
+    <span class="ai-tag">Claude</span>
+    <span class="ai-ripple"></span>
+    <div id="ai-note" class="hidden"></div>
+  </div>
+  </div>
+
+  <script src="../node_modules/@xterm/xterm/lib/xterm.js"></script>
+  <script src="../node_modules/@xterm/addon-fit/lib/addon-fit.js"></script>
+  <script src="../node_modules/@xterm/addon-web-links/lib/addon-web-links.js"></script>
   <script src="renderer.js"></script>
 </body></html>

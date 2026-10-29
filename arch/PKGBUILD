@@ -41,7 +41,7 @@ build() {
 package() {
   cd "${srcdir}/net-browser-${pkgver}"
   install -dm755 "${pkgdir}/usr/share/net-browser"
-  cp -r main.js preload.js package.json renderer "${pkgdir}/usr/share/net-browser/"
+  cp -r main.js preload.js package.json renderer ai "${pkgdir}/usr/share/net-browser/"
   cp -r node_modules "${pkgdir}/usr/share/net-browser/"
   # The npm-bundled Electron is NOT shipped: --omit=dev in build()
   # leaves it out, and the launcher uses the system electron binary.

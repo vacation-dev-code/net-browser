@@ -33,11 +33,17 @@
 //   * Electron allows ONE listener per webRequest event per session.
 //     Anything else registering onBeforeRequest / onHeadersReceived on
 //     that partition silently replaces the blocker.
+//
+// The Claude pane (ai/): a terminal running Claude Code beside the page
+// (ai/terminal.js), plus browser tools it uses to read, point at and
+// operate the active tab with its own visible cursor (ai/browser-tools.js).
 
 const { app, BrowserWindow, Menu, session, ipcMain, clipboard, nativeTheme } = require('electron');
 const path = require('node:path');
 const fs = require('node:fs');
 const { ElectronBlocker } = require('@ghostery/adblocker-electron');
+const browserTools = require('./ai/browser-tools');
+const terminal = require('./ai/terminal');
 
 const PARTITION = 'persist:minimal';
 const LIST_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
@@ -66,16 +72,19 @@ function blockerStatus() {
 }
 
 // Every page — the UI and each <webview> tab — gets:
-//   * Ctrl/⌘+1…9 → select tab 1…9. Caught here, before the page sees
-//     the key, so it works whichever page has focus.
+//   * Ctrl/⌘+1…9 → select tab 1…9, and Ctrl+` → show/hide the Claude
+//     pane (⌃` on macOS, where ⌘` cycles windows). Caught here, before
+//     the page sees the key, so they work whichever page has focus.
 //   * a right-click menu (Electron shows none by default): on a link,
 //     open in new tab / copy link; then cut / copy / paste as the
 //     selection and the field under the pointer allow.
 // <webview> tabs also get:
 //   * pointer forwarding. A guest swallows mouse events, so once a site
 //     is loaded the UI page never sees the pointer over it, and the
-//     hover-reveal tabs pane would only open on the start page. The tabs
-//     fill the window from (0, 0), so guest coordinates are window ones.
+//     hover-reveal tabs pane would only open on the start page. Guest
+//     coordinates are relative to the page area beside the Claude pane,
+//     which is what renderer.js measures in. Claude's own mouse events
+//     are not forwarded: its clicks must not pop the pane.
 //   * target=_blank links and window.open() as tabs, not bare windows.
 app.on('web-contents-created', (_event, contents) => {
   const type = contents.getType();
@@ -86,10 +95,22 @@ app.on('web-contents-created', (_event, contents) => {
   };
 
   contents.on('before-input-event', (event, input) => {
-    const mod = process.platform === 'darwin' ? input.meta : input.control;
-    if (input.type === 'keyDown' && mod && !input.alt && !input.shift && /^[1-9]$/.test(input.key)) {
+    if (input.type !== 'keyDown') return;
+    const plain = !input.alt && !input.shift;
+    const ctrl = input.control && !input.meta;
+    const mod = process.platform === 'darwin' ? input.meta && !input.control : ctrl;
+    if (plain && mod && /^[1-9]$/.test(input.key)) {
       event.preventDefault();
       ui()?.send('menu-action', `select-tab-${input.key}`);
+    } else if (plain && ctrl && input.code === 'Backquote') {
+      event.preventDefault();
+      ui()?.send('menu-action', 'toggle-ai');
+    } else if (type === 'window' && process.platform !== 'darwin' && plain && ctrl && input.code === 'KeyQ'
+      && terminal.isTerminalFocused(BrowserWindow.fromWebContents(contents)?.id)) {
+      // Menu shortcuts are off while the terminal has focus
+      // (ai/terminal.js), but Ctrl+Q should still quit.
+      event.preventDefault();
+      app.quit();
     }
   });
 
@@ -114,7 +135,14 @@ app.on('web-contents-created', (_event, contents) => {
 
   if (type !== 'webview') return;
   contents.on('input-event', (_e, input) => {
+    if (browserTools.isSynthetic(contents.id)) return;
     if (input.type === 'mouseMove') ui()?.send('guest-pointer', { x: input.x, y: input.y });
+    // The user clicked into a page: after Claude acts, the keyboard
+    // stays here instead of jumping back to the terminal.
+    else if (input.type === 'mouseDown') {
+      const win = ui() && BrowserWindow.fromWebContents(ui());
+      if (win) terminal.userLeftTerminal(win.id);
+    }
   });
   contents.setWindowOpenHandler(({ url, disposition }) => {
     ui()?.send('open-in-new-tab', url, { background: disposition === 'background-tab' });
@@ -122,7 +150,10 @@ app.on('web-contents-created', (_event, contents) => {
   });
 });
 
-function createWindow() {
+// launch: this is a window Net Browser opened at startup, where the
+// Claude pane opens by itself if ⋯ → Settings says so. Windows opened
+// later start without it, so each does not start a Claude session.
+function createWindow({ launch = false } = {}) {
   const isLinux = process.platform === 'linux';
   // Linux has no NSVisualEffectView / vibrancy, so the glass is
   // done in CSS (renderer/styles.css), not by the window system.
@@ -158,10 +189,15 @@ function createWindow() {
     },
   });
 
-  win.loadFile(path.join(__dirname, 'renderer', 'index.html'));
+  win.loadFile(path.join(__dirname, 'renderer', 'index.html'), launch ? { query: { launch: '1' } } : {});
+  return win;
+}
 
-  // Native menu, mainly so keyboard shortcuts work even when a
-  // <webview> has focus (renderer keydown listeners do NOT fire then).
+// Native menu, mainly so keyboard shortcuts work even when a <webview>
+// has focus (renderer keydown listeners do NOT fire then). Items act on
+// the window they are used in, which Electron passes to click().
+function buildMenu() {
+  const send = (action) => (_item, win) => win?.webContents.send('menu-action', action);
   const template = [
     {
       label: 'Net Browser',
@@ -174,23 +210,29 @@ function createWindow() {
     {
       label: 'File',
       submenu: [
-        { label: 'New Tab', accelerator: 'CmdOrCtrl+T', click: () => win.webContents.send('menu-action', 'new-tab') },
+        { label: 'New Tab', accelerator: 'CmdOrCtrl+T', click: send('new-tab') },
         { label: 'New Window', accelerator: 'CmdOrCtrl+N', click: () => createWindow() },
-        { label: 'Close Tab', accelerator: 'CmdOrCtrl+W', click: () => win.webContents.send('menu-action', 'close-tab') },
+        { label: 'Close Tab', accelerator: 'CmdOrCtrl+W', click: send('close-tab') },
       ],
     },
+    // macOS only routes ⌘C / ⌘V / ⌘X / ⌘A through an Edit menu — without
+    // one they do nothing, in pages and in the terminal alike.
+    ...(process.platform === 'darwin' ? [{ role: 'editMenu' }] : []),
     {
       label: 'View',
       submenu: [
-        { label: 'Go to URL…', accelerator: 'CmdOrCtrl+L', click: () => win.webContents.send('menu-action', 'go-to-url') },
-        { label: 'Reload', accelerator: 'CmdOrCtrl+R', click: () => win.webContents.send('menu-action', 'reload') },
-        { label: 'Back', accelerator: 'CmdOrCtrl+[', click: () => win.webContents.send('menu-action', 'back') },
-        { label: 'Forward', accelerator: 'CmdOrCtrl+]', click: () => win.webContents.send('menu-action', 'forward') },
+        { label: 'Go to URL…', accelerator: 'CmdOrCtrl+L', click: send('go-to-url') },
+        { label: 'Reload', accelerator: 'CmdOrCtrl+R', click: send('reload') },
+        { label: 'Back', accelerator: 'CmdOrCtrl+[', click: send('back') },
+        { label: 'Forward', accelerator: 'CmdOrCtrl+]', click: send('forward') },
+        { type: 'separator' },
+        // Shown here, handled in before-input-event above, so it works
+        // while the terminal has focus too.
+        { label: 'Claude Pane', accelerator: 'Ctrl+`', registerAccelerator: false, click: send('toggle-ai') },
       ],
     },
   ];
   Menu.setApplicationMenu(Menu.buildFromTemplate(template));
-  return win;
 }
 
 app.whenReady().then(async () => {
@@ -203,17 +245,27 @@ app.whenReady().then(async () => {
     console.error('The filter lists download on first launch — check the network, then restart.');
   }
 
+  // Claude pane: browser tools first, so the terminal can hand Claude
+  // Code their address. If they fail, the terminal still works.
+  try {
+    await browserTools.start(app.getPath('userData'));
+  } catch (err) {
+    console.error('Net Browser: Claude\'s browser tools failed to start:', err.message);
+  }
+  terminal.attach({ mcpConfig: browserTools.mcpConfig });
+
   // Renderer asks: is the blocker actually on, and what is it?
   ipcMain.handle('blocker-status', blockerStatus);
 
   // macOS traffic lights are native, not part of the page, so they
   // follow the tabs pane by hand: shown only while it is open, and
-  // moved into its top row on whichever edge it sits.
-  ipcMain.handle('window-buttons', (event, { visible, side, paneWidth, inset }) => {
+  // moved into its top row on whichever edge it sits. offsetLeft and
+  // offsetRight: where the page area starts and ends beside the Claude pane.
+  ipcMain.handle('window-buttons', (event, { visible, side, paneWidth, inset, offsetLeft = 0, offsetRight = 0 }) => {
     const w = BrowserWindow.fromWebContents(event.sender);
     if (!w || process.platform !== 'darwin') return;
     const [width] = w.getContentSize();
-    const x = side === 'left' ? inset + 20 : width - inset - paneWidth + 20;
+    const x = side === 'left' ? offsetLeft + inset + 20 : width - offsetRight - inset - paneWidth + 20;
     w.setWindowButtonPosition({ x, y: inset + 26 });
     w.setWindowButtonVisibility(visible);
   });
@@ -235,12 +287,15 @@ app.whenReady().then(async () => {
     return blockerStatus();
   });
 
-  createWindow();
+  buildMenu();
+  createWindow({ launch: true });
 
   app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow();
+    if (BrowserWindow.getAllWindows().length === 0) createWindow({ launch: true });
   });
 });
+
+app.on('will-quit', () => browserTools.stop());
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();

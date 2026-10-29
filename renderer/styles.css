@@ -21,10 +21,16 @@ button { font: inherit; color: inherit; cursor: pointer; }
    guest surface Chromium does not sample), the tint, rim and
    shadow still read as glass; @supports gives a solid fallback.
    There is no top bar: all chrome lives in the tabs pane, which
-   OVERLAYS the page, so the page always runs full-window. */
+   OVERLAYS the page, so the page runs the full height of the window.
+   The Claude pane is different: it is docked, and the page area
+   (#stage) shrinks beside it, so nothing Claude points at is covered. */
 :root {
   --pane-inset: 10px;
   --pane-width: 264px;
+  --ai-width: min(clamp(320px, 25vw, 640px), 45vw); /* a quarter, within reason */
+  --claude: #d97757;
+  --ai-tint: rgba(255, 255, 255, 0.70);
+  --ai-backdrop: #ececf0;
   --text: #1d1d1f;
   --text-muted: rgba(60, 60, 67, 0.62);
   --tint: rgba(255, 255, 255, 0.34);
@@ -66,6 +72,8 @@ button { font: inherit; color: inherit; cursor: pointer; }
     --page-muted: #8e8e93;
     --warn-bg: #3d3214;
     --warn-text: #f5d77a;
+    --ai-tint: rgba(30, 30, 35, 0.74);
+    --ai-backdrop: #0e0e10;
   }
 }
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
@@ -88,7 +96,14 @@ button { font: inherit; color: inherit; cursor: pointer; }
 }
 #blocker-warning code { background: rgba(0,0,0,0.08); padding: 1px 5px; border-radius: 4px; }
 
-/* Main area + tabs — full window, under the tabs pane */
+/* Page area: the whole window, or what the Claude pane leaves. Hidden
+   overflow clips the tabs pane while it is slid away, so it never shows
+   over the Claude pane, whichever sides the two are on. */
+#stage { position: absolute; top: 0; bottom: 0; left: 0; right: 0; overflow: hidden; }
+body.ai-open #stage { left: var(--ai-width); }
+body.ai-open.ai-right #stage { left: 0; right: var(--ai-width); }
+
+/* Main area + tabs — the whole page area, under the tabs pane */
 #main { position: absolute; top: 0; left: 0; right: 0; bottom: 0; }
 #tabs, #tabs webview { width: 100%; height: 100%; }
 #tabs webview { display: none; }
@@ -205,6 +220,7 @@ body.mac #pane-top { padding-left: 68px; } /* room for the traffic lights */
    inside the pane, so the pointer never leaves the pane using it ---- */
 #menu {
   position: absolute; bottom: 66px; left: 12px; right: 12px; z-index: 30; padding: 8px;
+  max-height: calc(100% - 80px); overflow-y: auto;
   border-radius: 20px; color: var(--text);
   background: radial-gradient(120% 50% at 0% 0%, var(--sheen), transparent 60%), var(--menu-tint);
   backdrop-filter: blur(30px) saturate(180%);
@@ -219,3 +235,94 @@ body.mac #pane-top { padding-left: 68px; } /* room for the traffic lights */
 .segmented { display: inline-flex; background: var(--hover); border-radius: 10px; padding: 3px; box-shadow: inset 0 1px 2px var(--shade); }
 .segmented button { border: 0; background: transparent; font-size: 12px; padding: 4px 9px; border-radius: 8px; }
 .segmented button.selected { background: var(--layer); box-shadow: inset 0 1px 0 var(--highlight), var(--layer-shadow); }
+
+/* ---- Claude pane -------------------------------------------------------
+   Docked, a quarter of the window, left by default (the tabs pane is
+   right). The same glass language as the tabs pane — an inset panel
+   with a sheen, a gradient rim and a raised header — but a denser tint,
+   because a terminal has to stay readable over anything. Behind it is a
+   plain backdrop, not the desktop: Linux windows get no system blur
+   (see the top of this file), and terminal text over a bare wallpaper
+   is unreadable. macOS shows its window vibrancy there instead. */
+#ai-pane {
+  position: absolute; top: 0; bottom: 0; left: 0; width: var(--ai-width);
+  display: none; padding: var(--pane-inset); background: var(--ai-backdrop);
+}
+body.mac #ai-pane { background: transparent; }
+body.ai-right #ai-pane { left: auto; right: 0; }
+body.ai-open #ai-pane { display: flex; }
+#ai-panel {
+  position: relative; flex: 1; min-width: 0; display: flex; flex-direction: column; overflow: hidden;
+  border-radius: 22px; color: var(--text);
+  background: radial-gradient(130% 50% at 0% 0%, var(--sheen), transparent 55%), var(--ai-tint);
+  backdrop-filter: blur(30px) saturate(170%);
+  -webkit-backdrop-filter: blur(30px) saturate(170%);
+  box-shadow: inset 0 1px 0 var(--highlight), inset 0 -1px 0 var(--shade), var(--layer-shadow);
+}
+#ai-panel::before {
+  content: ''; position: absolute; inset: 0; border-radius: inherit; padding: 1px; pointer-events: none;
+  background: linear-gradient(155deg, var(--rim-bright), var(--rim-dim) 32%, var(--rim-dim) 68%, var(--rim-bright));
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor; mask-composite: exclude;
+}
+/* Header: the Claude pane's drag handle on Linux's frameless window. */
+#ai-head {
+  display: flex; align-items: center; gap: 8px; height: 46px; margin: 8px 8px 0; padding: 0 4px 0 14px;
+  border-radius: 999px; background: var(--layer); font-size: 13px;
+  box-shadow: inset 0 1px 0 var(--highlight), inset 0 -1px 0 var(--shade), var(--layer-shadow);
+  -webkit-app-region: drag;
+}
+#ai-head button { -webkit-app-region: no-drag; width: 32px; height: 32px; }
+#ai-head .icon-btn svg { width: 16px; height: 16px; }
+.ai-mark { width: 10px; height: 10px; border-radius: 50%; background: var(--claude); box-shadow: 0 0 0 3px rgba(217, 119, 87, 0.22); }
+.ai-name { font-weight: 600; }
+.ai-sub { color: var(--text-muted); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#term { flex: 1; min-height: 0; padding: 10px 6px 10px 14px; }
+#term .xterm { height: 100%; }
+/* xterm draws its own slim scrollbar (coloured in renderer.js); the
+   native one under it would show as a grey bar with arrows. */
+#term { --vscode-scrollbar-shadow: transparent; }
+#term .xterm-viewport { background: transparent !important; scrollbar-width: none; }
+#term .xterm-viewport::-webkit-scrollbar { display: none; }
+
+/* ---- Claude's cursor ------------------------------------------------------
+   Coral, with a name tag, so it never reads as the user's own pointer.
+   It glides (main.js sets the duration from the distance), ripples on a
+   click, and can carry a glass note; a ring highlights what it points
+   at. Positions are page-area pixels; transform keeps the motion smooth. */
+#ai-cursor {
+  position: absolute; left: 0; top: 0; z-index: 40; pointer-events: none;
+  transition-property: transform, opacity; transition-timing-function: cubic-bezier(0.3, 0.8, 0.25, 1), ease;
+}
+#ai-cursor.idle { opacity: 0.55; }
+#ai-cursor svg {
+  position: absolute; left: -3px; top: -2.5px; width: 24px; height: 24px; overflow: visible;
+  fill: var(--claude); stroke: #fff; stroke-width: 1.6; stroke-linejoin: round;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.35));
+}
+.ai-tag {
+  position: absolute; left: 16px; top: 17px; padding: 2px 8px; border-radius: 999px; white-space: nowrap;
+  background: var(--claude); color: #fff; font-size: 11px; font-weight: 600; letter-spacing: 0.2px;
+  box-shadow: 0 3px 10px rgba(217, 119, 87, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+}
+.ai-ripple { position: absolute; left: -15px; top: -15px; width: 30px; height: 30px; border-radius: 50%; border: 2px solid var(--claude); opacity: 0; }
+#ai-cursor.clicking .ai-ripple { animation: ai-ripple 0.55s ease-out; }
+@keyframes ai-ripple { from { transform: scale(0.3); opacity: 0.9; } to { transform: scale(1.6); opacity: 0; } }
+#ai-note {
+  position: absolute; left: 16px; top: 44px; width: max-content; max-width: 260px; padding: 9px 12px;
+  border-radius: 14px; font-size: 13px; line-height: 1.4; color: var(--text);
+  background: radial-gradient(120% 60% at 0% 0%, var(--sheen), transparent 60%), var(--menu-tint);
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  box-shadow: inset 0 1px 0 var(--highlight), inset 3px 0 0 var(--claude), var(--shadow);
+}
+/* Near the right or bottom edge, the tag and note flip to stay on screen. */
+#ai-cursor.flip-x .ai-tag { left: auto; right: 10px; }
+#ai-cursor.flip-x #ai-note { left: auto; right: 10px; }
+#ai-cursor.flip-y #ai-note { top: auto; bottom: 10px; }
+#ai-box {
+  position: absolute; z-index: 39; pointer-events: none; border-radius: 10px;
+  background: rgba(217, 119, 87, 0.07);
+  box-shadow: 0 0 0 2px var(--claude), 0 0 0 7px rgba(217, 119, 87, 0.22);
+  transition: left 0.3s, top 0.3s, width 0.3s, height 0.3s;
+}
