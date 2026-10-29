@@ -1,5 +1,5 @@
 {
-  "description": "Net Browser v0.1 — a minimalist browser with uBlock Origin / EasyList ad blocking",
+  "description": "Net v0.1 — a minimalist browser with uBlock Origin / EasyList ad blocking",
   "devDependencies": {
     "electron": "^45.1.0"
   },
@@ -7,7 +7,9 @@
   "name": "net-browser",
   "private": true,
   "scripts": {
-    "start": "electron ."
+    "prestart": "node assets/mac-app-name.js",
+    "start": "electron .",
+    "build:mac": "bash assets/build-mac-app.sh"
   },
   "version": "0.1.0",
   "dependencies": {
@@ -16,5 +18,6 @@
     "@xterm/addon-fit": "^0.11.0",
     "@xterm/addon-web-links": "^0.12.0",
     "@xterm/xterm": "^6.0.0"
-  }
+  },
+  "productName": "Net"
 }
