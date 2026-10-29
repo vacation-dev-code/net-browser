@@ -12,6 +12,8 @@ contextBridge.exposeInMainWorld('minimal', {
   // Links a page asked to open in a new tab: right-click → Open Link
   // in New Tab, target=_blank, window.open() (see main.js).
   onOpenInNewTab: (callback) => ipcRenderer.on('open-in-new-tab', (_event, url, options) => callback(url, options)),
+  // History menu → a page, opened in the current tab.
+  onNavigateActive: (callback) => ipcRenderer.on('navigate-active', (_event, url) => callback(url)),
   // Tabs pane: pointer position over the <webview> tabs (see main.js),
   // and the macOS traffic lights following the pane.
   onGuestPointer: (callback) => ipcRenderer.on('guest-pointer', (_event, point) => callback(point)),

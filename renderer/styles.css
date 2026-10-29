@@ -235,6 +235,7 @@ body.mac #pane-top { padding-left: 68px; } /* room for the traffic lights */
 .segmented { display: inline-flex; background: var(--hover); border-radius: 10px; padding: 3px; box-shadow: inset 0 1px 2px var(--shade); }
 .segmented button { border: 0; background: transparent; font-size: 12px; padding: 4px 9px; border-radius: 8px; }
 .segmented button.selected { background: var(--layer); box-shadow: inset 0 1px 0 var(--highlight), var(--layer-shadow); }
+#glass-transparency { width: 110px; accent-color: #0a7cff; }
 
 /* ---- Claude pane -------------------------------------------------------
    Docked, a quarter of the window, left by default (the tabs pane is

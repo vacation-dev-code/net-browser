@@ -5,3 +5,4 @@ dist/
 # Leftovers from the image generator: a duplicate of net-browser-logo.webp,
 # and a JSON with a signed CDN link to the generated image.
 media-generation-*
+assets/Net.icns
